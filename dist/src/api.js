@@ -3,7 +3,7 @@
  * Connects directly to the FastAPI Wude Mart Backend API.
  */
 
-const DEFAULT_API_BASE = 'http://127.0.0.1:8000';
+const DEFAULT_API_BASE = 'https://wude-mart-backend.kilom7628.workers.dev';
 
 export function getApiBaseUrl() {
   if (typeof window !== 'undefined') {

@@ -50,7 +50,7 @@ function escapeHtml(str) {
 
 function formatCurrency(amount) {
   const num = parseFloat(amount) || 0;
-  return '$' + num.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  return 'ETB ' + num.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
 function formatDate(isoStr) {
@@ -461,7 +461,7 @@ function renderDashboardView() {
         <div class="bg-surface-container-lowest rounded shadow-sm p-space-lg flex flex-col justify-between">
           <div class="flex items-start justify-between">
             <div>
-              <span class="font-label-sm text-[11px] text-on-surface-variant uppercase tracking-wider font-semibold">Settled Revenue</span>
+              <span class="font-label-sm text-[11px] text-on-surface-variant uppercase tracking-wider font-semibold">Settled Revenue (ETB)</span>
               <div class="font-display-lg text-display-lg text-on-surface tracking-tight font-semibold tabular-nums mt-[2px]">${formatCurrency(totalRevenue)}</div>
             </div>
             <div class="p-space-xs rounded bg-surface-container text-primary">
@@ -543,7 +543,7 @@ function renderDashboardView() {
                 <th class="py-space-sm px-space-lg">Order ID</th>
                 <th class="py-space-sm px-space-md">Customer</th>
                 <th class="py-space-sm px-space-md">Date</th>
-                <th class="py-space-sm px-space-md">Total</th>
+                <th class="py-space-sm px-space-md">Total (ETB)</th>
                 <th class="py-space-sm px-space-md">Status</th>
                 <th class="py-space-sm px-space-lg text-right">Action</th>
               </tr>
@@ -600,8 +600,8 @@ function renderDashboardView() {
           </div>
           <div class="bg-surface-container-lowest p-space-md rounded">
             <span class="font-label-sm text-[11px] text-on-surface-variant uppercase font-semibold">Average Cart Yield</span>
-            <div class="font-headline-md text-headline-md font-semibold text-on-surface mt-[2px] tabular-nums">$103.77</div>
-            <span class="text-on-surface-variant font-tabular-sm text-[11px]">Computed average target</span>
+            <div class="font-headline-md text-headline-md font-semibold text-on-surface mt-[2px] tabular-nums">${formatCurrency(state.orders.length > 0 ? (state.orders.reduce((acc, o) => acc + (parseFloat(o.total) || 0), 0) / state.orders.length) : 0)}</div>
+            <span class="text-on-surface-variant font-tabular-sm text-[11px]">Computed live average</span>
           </div>
         </div>
       </div>
@@ -704,7 +704,7 @@ function renderOrdersView() {
                 <th class="py-space-sm px-space-md">Customer Email</th>
                 <th class="py-space-sm px-space-md">Created At</th>
                 <th class="py-space-sm px-space-md">Customer Note</th>
-                <th class="py-space-sm px-space-md">Total</th>
+                <th class="py-space-sm px-space-md">Total (ETB)</th>
                 <th class="py-space-sm px-space-md">Status</th>
                 <th class="py-space-sm px-space-lg text-right">Actions</th>
               </tr>
@@ -816,7 +816,7 @@ function openOrderDetailDrawer(order) {
 
           <!-- Financial Summary -->
           <div class="flex items-center justify-between p-space-md rounded bg-surface-container-low">
-            <span class="font-label-md text-label-md text-on-surface font-semibold">Grand Total Billed</span>
+            <span class="font-label-md text-label-md text-on-surface font-semibold">Grand Total Billed (ETB)</span>
             <span class="font-headline-md text-headline-md text-on-surface font-bold tabular-nums">${formatCurrency(order.total)}</span>
           </div>
 
@@ -1376,7 +1376,7 @@ function renderProductsView() {
               <tr class="bg-surface-container-low text-on-surface-variant font-label-sm text-[11px] uppercase tracking-wider">
                 <th class="py-space-sm px-space-lg">Product</th>
                 <th class="py-space-sm px-space-md">SKU ID</th>
-                <th class="py-space-sm px-space-md">Price</th>
+                <th class="py-space-sm px-space-md">Price (ETB)</th>
                 <th class="py-space-sm px-space-md">Status</th>
                 <th class="py-space-sm px-space-lg text-right">Actions</th>
               </tr>
@@ -1518,11 +1518,11 @@ function openProductDrawer(product) {
 
           <!-- Price -->
           <div class="flex flex-col gap-space-2xs">
-            <label class="font-label-sm text-[11px] uppercase font-semibold text-on-surface-variant">Price (USD / ETB) *</label>
+            <label class="font-label-sm text-[11px] uppercase font-semibold text-on-surface-variant">Price (ETB) *</label>
             <div class="relative">
-              <span class="absolute left-space-md top-1/2 -translate-y-1/2 font-semibold text-on-surface-variant">$</span>
+              <span class="absolute left-space-md top-1/2 -translate-y-1/2 font-semibold text-on-surface-variant text-[12px]">ETB</span>
               <input id="prod-price" type="number" step="0.01" min="0" required value="${product ? product.price : ''}" placeholder="0.00"
-                class="w-full pl-8 pr-space-md py-[8px] rounded bg-surface-container-low border border-surface-container font-body-sm text-body-sm text-on-surface font-mono focus:outline-none focus:ring-1 focus:ring-primary" />
+                class="w-full pl-12 pr-space-md py-[8px] rounded bg-surface-container-low border border-surface-container font-body-sm text-body-sm text-on-surface font-mono focus:outline-none focus:ring-1 focus:ring-primary" />
             </div>
           </div>
 
