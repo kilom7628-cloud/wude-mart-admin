@@ -217,4 +217,59 @@ export const api = {
       }),
     });
   },
+
+  // Payment Methods Management
+  async getPaymentMethods() {
+    return apiRequest('/api/admin/payment-methods', { method: 'GET' });
+  },
+
+  async createPaymentMethod({ provider_name, account_number, account_name, instructions = '', is_active = true, display_order = 0 }) {
+    return apiRequest('/api/admin/payment-methods', {
+      method: 'POST',
+      body: JSON.stringify({
+        provider_name: provider_name.trim(),
+        account_number: account_number.trim(),
+        account_name: account_name.trim(),
+        instructions: instructions.trim(),
+        is_active: Boolean(is_active),
+        display_order: parseInt(display_order, 10) || 0,
+      }),
+    });
+  },
+
+  async updatePaymentMethod(methodId, updates) {
+    const payload = {};
+    if (updates.provider_name !== undefined) payload.provider_name = updates.provider_name.trim();
+    if (updates.account_number !== undefined) payload.account_number = updates.account_number.trim();
+    if (updates.account_name !== undefined) payload.account_name = updates.account_name.trim();
+    if (updates.instructions !== undefined) payload.instructions = updates.instructions.trim();
+    if (updates.is_active !== undefined) payload.is_active = Boolean(updates.is_active);
+    if (updates.display_order !== undefined) payload.display_order = parseInt(updates.display_order, 10) || 0;
+
+    return apiRequest(`/api/admin/payment-methods/${methodId}`, {
+      method: 'PATCH',
+      body: JSON.stringify(payload),
+    });
+  },
+
+  async deletePaymentMethod(methodId) {
+    return apiRequest(`/api/admin/payment-methods/${methodId}`, {
+      method: 'DELETE',
+    });
+  },
+
+  // Order & Transaction Messaging
+  async getOrderMessages(orderId) {
+    return apiRequest(`/api/orders/${orderId}/messages`, { method: 'GET' });
+  },
+
+  async sendOrderMessage(orderId, { message, message_type = 'general' }) {
+    return apiRequest(`/api/orders/${orderId}/messages`, {
+      method: 'POST',
+      body: JSON.stringify({
+        message: message.trim(),
+        message_type: message_type.trim(),
+      }),
+    });
+  },
 };

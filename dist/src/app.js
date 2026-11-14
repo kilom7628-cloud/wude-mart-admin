@@ -11,11 +11,13 @@ const state = {
   orders: [],
   payments: [],
   products: [],
+  paymentMethods: [],
   
   // Selected items for drawers/inspectors
   selectedOrder: null,
   selectedPayment: null,
   editingProduct: null,
+  editingPaymentMethod: null,
   
   // Canvas transform state for payment verification
   canvas: {
@@ -34,6 +36,10 @@ const state = {
   productFilter: {
     search: '',
     available: 'all',
+  },
+  paymentMethodFilter: {
+    search: '',
+    status: 'all',
   },
 };
 
@@ -128,14 +134,16 @@ async function checkBackendHealth() {
 async function loadRouteData(route) {
   try {
     if (route === 'dashboard') {
-      const [orders, payments, products] = await Promise.allSettled([
+      const [orders, payments, products, paymentMethods] = await Promise.allSettled([
         api.getOrders(),
         api.getPayments(),
         api.getProducts(),
+        api.getPaymentMethods(),
       ]);
       if (orders.status === 'fulfilled') state.orders = orders.value;
       if (payments.status === 'fulfilled') state.payments = payments.value;
       if (products.status === 'fulfilled') state.products = products.value;
+      if (paymentMethods.status === 'fulfilled') state.paymentMethods = paymentMethods.value;
       renderDashboardView();
     } else if (route === 'orders') {
       state.orders = await api.getOrders();
@@ -149,6 +157,9 @@ async function loadRouteData(route) {
     } else if (route === 'products') {
       state.products = await api.getProducts();
       renderProductsView();
+    } else if (route === 'payment-methods') {
+      state.paymentMethods = await api.getPaymentMethods();
+      renderPaymentMethodsView();
     }
   } catch (err) {
     showToast(err.message, 'error');
@@ -207,6 +218,7 @@ function renderApp() {
   else if (state.currentRoute === 'orders') renderOrdersView();
   else if (state.currentRoute === 'payments') renderPaymentsView();
   else if (state.currentRoute === 'products') renderProductsView();
+  else if (state.currentRoute === 'payment-methods') renderPaymentMethodsView();
 }
 
 function renderSidebar() {
@@ -263,6 +275,14 @@ function renderSidebar() {
               <span class="font-label-md text-label-md">Products Catalog</span>
             </div>
             ${state.products.length > 0 ? `<span class="px-[6px] py-[1px] rounded-full bg-white/10 text-white font-tabular-sm text-[11px]">${state.products.length}</span>` : ''}
+          </a>
+
+          <a href="#payment-methods" class="flex items-center justify-between px-space-md py-[10px] rounded transition-colors ${isNavActive('payment-methods')}">
+            <div class="flex items-center gap-space-sm">
+              <span class="material-symbols-outlined text-[20px]">account_balance</span>
+              <span class="font-label-md text-label-md">Payment Methods</span>
+            </div>
+            ${state.paymentMethods?.length > 0 ? `<span class="px-[6px] py-[1px] rounded-full bg-white/10 text-white font-tabular-sm text-[11px]">${state.paymentMethods.length}</span>` : ''}
           </a>
         </nav>
       </div>
@@ -855,6 +875,56 @@ function openOrderDetailDrawer(order) {
               <span>Apply Status Update</span>
             </button>
           </div>
+
+          <!-- Transaction & Order Messaging -->
+          <div class="border border-surface-container rounded p-space-md flex flex-col gap-space-md bg-surface-container-low/50">
+            <div class="flex items-center justify-between">
+              <div class="flex items-center gap-space-xs">
+                <span class="material-symbols-outlined text-[20px] text-primary">chat</span>
+                <span class="font-label-md text-label-md font-semibold text-on-surface">Order & Transaction Messages</span>
+              </div>
+              <span id="drawer-messages-count" class="font-label-sm text-[11px] px-[6px] py-[1px] rounded-full bg-surface-container text-on-surface-variant font-medium">0 messages</span>
+            </div>
+            <p class="font-body-sm text-[12px] text-on-surface-variant">
+              Customer order communication thread. Messages are saved in the database and visible to the customer in the Android app and website.
+            </p>
+
+            <!-- Message Timeline -->
+            <div id="drawer-messages-list" class="max-h-60 overflow-y-auto flex flex-col gap-space-xs p-space-xs bg-surface-container-lowest rounded border border-surface-container">
+              <div class="py-space-md text-center text-on-surface-variant font-body-sm text-[12px]">Loading messages...</div>
+            </div>
+
+            <!-- Quick Preset Chips -->
+            <div class="flex flex-col gap-space-2xs">
+              <span class="font-label-sm text-[10px] uppercase font-semibold text-on-surface-variant">Quick Presets:</span>
+              <div class="flex flex-wrap gap-[6px]">
+                <button type="button" class="msg-preset-btn px-space-xs py-[3px] rounded bg-surface-container hover:bg-surface-container-high font-label-sm text-[11px] text-on-surface transition-colors" data-msg="Payment received and currently awaiting verification by our finance team." data-type="payment_received">Payment Received</button>
+                <button type="button" class="msg-preset-btn px-space-xs py-[3px] rounded bg-surface-container hover:bg-surface-container-high font-label-sm text-[11px] text-on-surface transition-colors" data-msg="Payment approved! Your items are now being processed for delivery." data-type="payment_approved">Payment Approved</button>
+                <button type="button" class="msg-preset-btn px-space-xs py-[3px] rounded bg-surface-container hover:bg-surface-container-high font-label-sm text-[11px] text-on-surface transition-colors" data-msg="Payment proof rejected. The uploaded receipt does not match the billed transaction. Please re-upload a valid slip." data-type="payment_rejected">Payment Rejected</button>
+                <button type="button" class="msg-preset-btn px-space-xs py-[3px] rounded bg-surface-container hover:bg-surface-container-high font-label-sm text-[11px] text-on-surface transition-colors" data-msg="Please provide your contact phone number or delivery location landmark." data-type="info_requested">Info Requested</button>
+                <button type="button" class="msg-preset-btn px-space-xs py-[3px] rounded bg-surface-container hover:bg-surface-container-high font-label-sm text-[11px] text-on-surface transition-colors" data-msg="Your order has been dispatched for delivery via courier." data-type="status_update">Delivery Update</button>
+              </div>
+            </div>
+
+            <!-- Message Compose Box -->
+            <div class="flex flex-col gap-space-xs mt-space-2xs">
+              <div class="flex items-center gap-space-xs">
+                <select id="drawer-msg-type" class="px-space-xs py-[4px] rounded bg-surface-container-lowest border border-surface-container font-label-sm text-[11px] text-on-surface">
+                  <option value="general">General Message</option>
+                  <option value="payment_received">Payment Received</option>
+                  <option value="payment_approved">Payment Approved</option>
+                  <option value="payment_rejected">Payment Rejected</option>
+                  <option value="info_requested">Info Requested</option>
+                  <option value="status_update">Status Update</option>
+                </select>
+              </div>
+              <textarea id="drawer-msg-input" rows="2" placeholder="Write a transaction message or update for the customer..." class="w-full p-space-sm rounded bg-surface-container-lowest border border-surface-container font-body-sm text-[13px] text-on-surface focus:outline-none focus:ring-1 focus:ring-primary"></textarea>
+              <button id="drawer-send-msg-btn" class="self-end flex items-center gap-space-2xs px-space-md py-[6px] rounded bg-primary text-on-primary hover:bg-primary-container font-label-sm text-[12px] font-semibold transition-colors shadow-sm">
+                <span class="material-symbols-outlined text-[16px]">send</span>
+                <span>Send Message</span>
+              </button>
+            </div>
+          </div>
         </div>
 
         <!-- Drawer Footer -->
@@ -883,6 +953,85 @@ function openOrderDetailDrawer(order) {
       state.selectedPayment = matchedPayment;
     }
     navigateTo('payments');
+  });
+
+  // Load and render order messages
+  const reloadOrderMessages = async () => {
+    const listEl = document.getElementById('drawer-messages-list');
+    const countEl = document.getElementById('drawer-messages-count');
+    if (!listEl) return;
+    try {
+      const messages = await api.getOrderMessages(order.id);
+      if (countEl) countEl.textContent = `${messages.length} message${messages.length === 1 ? '' : 's'}`;
+      if (!messages || messages.length === 0) {
+        listEl.innerHTML = `
+          <div class="py-space-md text-center text-on-surface-variant font-body-sm text-[12px]">
+            No messages logged yet for this order. Send a message to the customer below.
+          </div>
+        `;
+        return;
+      }
+      listEl.innerHTML = messages.map(m => {
+        const isAdm = m.sender_role === 'admin';
+        const isSys = m.sender_role === 'system';
+        const badgeColor = isAdm ? 'bg-primary/10 text-primary border-primary/20' : (isSys ? 'bg-surface-container-high text-on-surface-variant' : 'bg-[#065F46]/10 text-[#065F46] border-[#065F46]/20');
+        const typeBadge = m.message_type && m.message_type !== 'general' ? `
+          <span class="px-[5px] py-[1px] rounded text-[10px] font-semibold bg-surface-container text-on-surface-variant uppercase">
+            ${escapeHtml(m.message_type.replace('_', ' '))}
+          </span>
+        ` : '';
+        return `
+          <div class="p-space-sm rounded ${isAdm ? 'bg-primary/5 border border-primary/10' : 'bg-surface-container-low border border-surface-container'} flex flex-col gap-[3px]">
+            <div class="flex items-center justify-between">
+              <div class="flex items-center gap-space-2xs">
+                <span class="font-label-sm text-[11px] font-bold px-[6px] py-[1px] rounded border ${badgeColor}">
+                  ${isAdm ? 'Admin' : (isSys ? 'System' : 'Customer')}
+                </span>
+                ${typeBadge}
+              </div>
+              <span class="font-mono text-[10px] text-on-surface-variant">${formatDate(m.created_at)}</span>
+            </div>
+            <p class="font-body-sm text-[12px] text-on-surface whitespace-pre-wrap mt-[2px]">${escapeHtml(m.message)}</p>
+          </div>
+        `;
+      }).join('');
+      listEl.scrollTop = listEl.scrollHeight;
+    } catch (e) {
+      if (listEl) listEl.innerHTML = `<div class="p-space-sm text-error text-[12px]">Failed to load messages: ${escapeHtml(e.message)}</div>`;
+    }
+  };
+
+  reloadOrderMessages();
+
+  // Quick preset buttons
+  document.querySelectorAll('.msg-preset-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const msgInput = document.getElementById('drawer-msg-input');
+      const typeSelect = document.getElementById('drawer-msg-type');
+      if (msgInput) msgInput.value = btn.dataset.msg;
+      if (typeSelect) typeSelect.value = btn.dataset.type;
+    });
+  });
+
+  // Send message action
+  document.getElementById('drawer-send-msg-btn')?.addEventListener('click', async () => {
+    const msgInput = document.getElementById('drawer-msg-input');
+    const typeSelect = document.getElementById('drawer-msg-type');
+    const message = msgInput?.value.trim();
+    const message_type = typeSelect?.value || 'general';
+    if (!message) {
+      showToast('Please type a message before sending.', 'error');
+      return;
+    }
+    try {
+      showToast('Sending message to customer...', 'info');
+      await api.sendOrderMessage(order.id, { message, message_type });
+      showToast('Message sent and recorded in customer order timeline.', 'success');
+      if (msgInput) msgInput.value = '';
+      await reloadOrderMessages();
+    } catch (err) {
+      showToast(err.message, 'error');
+    }
   });
 
   // Update status action
@@ -1620,7 +1769,345 @@ function openProductDrawer(product) {
 }
 
 // -------------------------------------------------------------
-// 5. ADMIN AUTHENTICATION GATE
+// 5. PAYMENT METHODS MANAGEMENT VIEW
+// -------------------------------------------------------------
+function renderPaymentMethodsView() {
+  const viewEl = document.getElementById('main-view');
+  if (!viewEl) return;
+
+  const totalMethods = state.paymentMethods.length;
+  const activeCount = state.paymentMethods.filter(m => m.is_active === 1 || m.is_active === true).length;
+  const inactiveCount = totalMethods - activeCount;
+
+  let filtered = [...state.paymentMethods];
+  if (state.paymentMethodFilter.status === 'active') {
+    filtered = filtered.filter(m => m.is_active === 1 || m.is_active === true);
+  } else if (state.paymentMethodFilter.status === 'inactive') {
+    filtered = filtered.filter(m => m.is_active === 0 || m.is_active === false);
+  }
+  if (state.paymentMethodFilter.search) {
+    const q = state.paymentMethodFilter.search.toLowerCase();
+    filtered = filtered.filter(m =>
+      (m.provider_name || '').toLowerCase().includes(q) ||
+      (m.account_number || '').toLowerCase().includes(q) ||
+      (m.account_name || '').toLowerCase().includes(q) ||
+      (m.instructions || '').toLowerCase().includes(q)
+    );
+  }
+
+  viewEl.innerHTML = `
+    <div class="flex flex-col gap-gutter-desktop">
+      <!-- Header -->
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-space-md">
+        <div>
+          <h1 class="font-headline-lg text-headline-lg font-bold text-on-surface tracking-tight">Payment Methods</h1>
+          <p class="font-body-md text-body-md text-on-surface-variant mt-[2px]">
+            Manage dynamic payment providers (Telebirr, CBE, Abyssinia), bank accounts, and wallet instructions displayed to customers.
+          </p>
+        </div>
+        <button id="add-payment-method-btn" class="flex items-center gap-space-xs px-space-lg py-[10px] rounded bg-primary text-on-primary hover:bg-primary-container font-label-md text-label-md font-semibold transition-colors shadow-sm shrink-0">
+          <span class="material-symbols-outlined text-[18px]">add_circle</span>
+          <span>Add Payment Method</span>
+        </button>
+      </div>
+
+      <!-- Bento Cards -->
+      <div class="grid grid-cols-1 sm:grid-cols-3 gap-space-md">
+        <div class="bg-surface-container-lowest p-space-md rounded shadow-sm border border-surface-container">
+          <span class="font-label-sm text-[11px] text-on-surface-variant uppercase font-semibold">Total Configured Methods</span>
+          <div class="font-headline-md text-headline-md font-semibold text-on-surface mt-[2px] tabular-nums">${totalMethods}</div>
+          <span class="text-on-surface-variant font-tabular-sm text-[11px]">Dynamic backend storage</span>
+        </div>
+        <div class="bg-surface-container-lowest p-space-md rounded shadow-sm border border-surface-container">
+          <span class="font-label-sm text-[11px] text-[#065F46] uppercase font-semibold">Active at Checkout</span>
+          <div class="font-headline-md text-headline-md font-semibold text-[#065F46] mt-[2px] tabular-nums">${activeCount}</div>
+          <span class="text-[#065F46] font-tabular-sm text-[11px]">Available to customers</span>
+        </div>
+        <div class="bg-surface-container-lowest p-space-md rounded shadow-sm border border-surface-container">
+          <span class="font-label-sm text-[11px] text-on-surface-variant uppercase font-semibold">Disabled / Paused</span>
+          <div class="font-headline-md text-headline-md font-semibold text-on-surface mt-[2px] tabular-nums">${inactiveCount}</div>
+          <span class="text-on-surface-variant font-tabular-sm text-[11px]">Hidden from mobile app & web</span>
+        </div>
+      </div>
+
+      <!-- Controls & Filter Toolbar -->
+      <div class="bg-surface-container-lowest rounded shadow-sm p-space-md flex flex-col sm:flex-row items-center justify-between gap-space-md border border-surface-container">
+        <div class="relative w-full sm:w-80">
+          <span class="material-symbols-outlined absolute left-space-md top-1/2 -translate-y-1/2 text-on-surface-variant text-[18px]">search</span>
+          <input id="pm-search-input" type="text" value="${escapeHtml(state.paymentMethodFilter.search)}" placeholder="Search provider, account number, or name..."
+            class="w-full pl-10 pr-space-md py-[7px] rounded bg-surface-container-low border border-surface-container font-body-sm text-body-sm text-on-surface focus:outline-none focus:ring-1 focus:ring-primary" />
+        </div>
+        <div class="flex items-center gap-[6px] w-full sm:w-auto overflow-x-auto pb-1 sm:pb-0">
+          <button class="pm-filter-chip px-space-sm py-[5px] rounded font-label-sm text-[12px] font-semibold transition-colors ${state.paymentMethodFilter.status === 'all' ? 'bg-primary text-on-primary' : 'bg-surface-container text-on-surface hover:bg-surface-container-high'}" data-status="all">All (${totalMethods})</button>
+          <button class="pm-filter-chip px-space-sm py-[5px] rounded font-label-sm text-[12px] font-semibold transition-colors ${state.paymentMethodFilter.status === 'active' ? 'bg-primary text-on-primary' : 'bg-surface-container text-on-surface hover:bg-surface-container-high'}" data-status="active">Active (${activeCount})</button>
+          <button class="pm-filter-chip px-space-sm py-[5px] rounded font-label-sm text-[12px] font-semibold transition-colors ${state.paymentMethodFilter.status === 'inactive' ? 'bg-primary text-on-primary' : 'bg-surface-container text-on-surface hover:bg-surface-container-high'}" data-status="inactive">Inactive (${inactiveCount})</button>
+        </div>
+      </div>
+
+      <!-- Payment Methods List -->
+      <div class="bg-surface-container-lowest rounded shadow-sm border border-surface-container overflow-hidden">
+        <div class="overflow-x-auto">
+          <table class="w-full text-left border-collapse">
+            <thead>
+              <tr class="bg-surface-container-low text-on-surface-variant font-label-sm text-[11px] uppercase tracking-wider">
+                <th class="py-space-sm px-space-lg">Provider / Wallet</th>
+                <th class="py-space-sm px-space-md">Account / Merchant No.</th>
+                <th class="py-space-sm px-space-md">Account Name</th>
+                <th class="py-space-sm px-space-md">Instructions</th>
+                <th class="py-space-sm px-space-md">Status</th>
+                <th class="py-space-sm px-space-lg text-right">Actions</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-surface-container font-body-sm text-body-sm text-on-surface">
+              ${filtered.length === 0 ? `
+                <tr>
+                  <td colspan="6" class="py-space-xl text-center text-on-surface-variant">
+                    No payment methods found. Click "+ Add Payment Method" to configure Telebirr, CBE, or bank accounts.
+                  </td>
+                </tr>
+              ` : filtered.map(m => `
+                <tr class="hover:bg-surface-container-low transition-colors" data-pm-id="${m.id}">
+                  <td class="py-space-md px-space-lg font-semibold flex items-center gap-space-xs">
+                    <span class="material-symbols-outlined text-primary text-[18px]">account_balance_wallet</span>
+                    <span>${escapeHtml(m.provider_name)}</span>
+                  </td>
+                  <td class="py-space-md px-space-md font-mono font-medium">${escapeHtml(m.account_number)}</td>
+                  <td class="py-space-md px-space-md">${escapeHtml(m.account_name)}</td>
+                  <td class="py-space-md px-space-md max-w-xs text-on-surface-variant truncate" title="${escapeHtml(m.instructions || '')}">
+                    ${escapeHtml(m.instructions || '—')}
+                  </td>
+                  <td class="py-space-md px-space-md">
+                    ${(m.is_active === 1 || m.is_active === true) ? `
+                      <span class="inline-flex items-center gap-space-2xs px-space-sm py-[2px] rounded-full font-label-sm text-[11px] font-semibold bg-[#D1FAE5] text-[#065F46]">
+                        <span class="w-1.5 h-1.5 rounded-full bg-[#065F46]"></span>
+                        <span>Active</span>
+                      </span>
+                    ` : `
+                      <span class="inline-flex items-center gap-space-2xs px-space-sm py-[2px] rounded-full font-label-sm text-[11px] font-semibold bg-surface-container-high text-on-surface-variant">
+                        <span class="w-1.5 h-1.5 rounded-full bg-on-surface-variant"></span>
+                        <span>Inactive</span>
+                      </span>
+                    `}
+                  </td>
+                  <td class="py-space-md px-space-lg text-right">
+                    <div class="flex items-center justify-end gap-space-xs">
+                      <button class="toggle-pm-btn px-space-xs py-[4px] rounded text-[12px] font-semibold ${m.is_active ? 'text-on-surface-variant hover:text-error' : 'text-[#065F46] hover:bg-[#D1FAE5]/40'}" data-pm-id="${m.id}" data-active="${m.is_active ? '1' : '0'}" title="${m.is_active ? 'Deactivate' : 'Activate'}">
+                        ${m.is_active ? 'Deactivate' : 'Activate'}
+                      </button>
+                      <button class="edit-pm-btn px-space-sm py-[4px] rounded bg-surface-container hover:bg-surface-container-high text-on-surface font-label-sm text-[12px] font-semibold transition-colors" data-pm-id="${m.id}">
+                        Edit
+                      </button>
+                      <button class="delete-pm-btn p-space-xs rounded text-on-surface-variant hover:text-error hover:bg-error/10 transition-colors" data-pm-id="${m.id}" title="Delete">
+                        <span class="material-symbols-outlined text-[16px]">delete</span>
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  `;
+
+  attachPaymentMethodsEvents();
+}
+
+function openPaymentMethodDrawer(method) {
+  const isEditing = Boolean(method);
+  const drawerEl = document.getElementById('drawer-container');
+  if (!drawerEl) return;
+
+  drawerEl.innerHTML = `
+    <div id="drawer-backdrop" class="fixed inset-0 bg-black/40 z-50 flex justify-end">
+      <div class="drawer-panel w-full max-w-lg bg-surface-container-lowest h-full shadow-2xl flex flex-col justify-between overflow-y-auto">
+        <div class="p-space-lg border-b border-surface-container flex items-center justify-between sticky top-0 bg-surface-container-lowest z-10">
+          <div>
+            <h3 class="font-headline-sm text-headline-sm font-semibold text-on-surface">
+              ${isEditing ? `Edit ${escapeHtml(method.provider_name)}` : 'Add Dynamic Payment Method'}
+            </h3>
+            <span class="font-body-sm text-[12px] text-on-surface-variant">Configures accounts for customer checkout instructions</span>
+          </div>
+          <button id="close-drawer-btn" class="p-space-xs text-on-surface-variant hover:text-on-surface rounded">
+            <span class="material-symbols-outlined text-[20px]">close</span>
+          </button>
+        </div>
+
+        <form id="payment-method-form" class="p-space-lg flex flex-col gap-space-lg flex-1">
+          <div class="flex flex-col gap-space-2xs">
+            <label class="font-label-sm text-[11px] uppercase font-semibold text-on-surface-variant">Provider / Wallet Name *</label>
+            <input id="pm-provider" list="ethiopian-providers" type="text" required value="${escapeHtml(method?.provider_name || '')}" placeholder="e.g. Telebirr, CBE, Bank of Abyssinia"
+              class="w-full px-space-md py-[8px] rounded bg-surface-container-low border border-surface-container font-body-sm text-body-sm text-on-surface focus:outline-none focus:ring-1 focus:ring-primary" />
+            <datalist id="ethiopian-providers">
+              <option value="Telebirr"></option>
+              <option value="Commercial Bank of Ethiopia (CBE)"></option>
+              <option value="Bank of Abyssinia"></option>
+              <option value="Awash Bank"></option>
+              <option value="Dashen Bank"></option>
+              <option value="CBE Birr"></option>
+              <option value="Wegagen Bank"></option>
+              <option value="Hibret Bank"></option>
+            </datalist>
+          </div>
+
+          <div class="flex flex-col gap-space-2xs">
+            <label class="font-label-sm text-[11px] uppercase font-semibold text-on-surface-variant">Account or Merchant Number *</label>
+            <input id="pm-account-number" type="text" required value="${escapeHtml(method?.account_number || '')}" placeholder="e.g. 0911223344 or 1000123456789"
+              class="w-full px-space-md py-[8px] rounded bg-surface-container-low border border-surface-container font-mono text-body-sm text-on-surface focus:outline-none focus:ring-1 focus:ring-primary" />
+          </div>
+
+          <div class="flex flex-col gap-space-2xs">
+            <label class="font-label-sm text-[11px] uppercase font-semibold text-on-surface-variant">Account Holder Name *</label>
+            <input id="pm-account-name" type="text" required value="${escapeHtml(method?.account_name || '')}" placeholder="e.g. Wude Mart Store"
+              class="w-full px-space-md py-[8px] rounded bg-surface-container-low border border-surface-container font-body-sm text-body-sm text-on-surface focus:outline-none focus:ring-1 focus:ring-primary" />
+          </div>
+
+          <div class="flex flex-col gap-space-2xs">
+            <label class="font-label-sm text-[11px] uppercase font-semibold text-on-surface-variant">Payment Instructions for Customer</label>
+            <textarea id="pm-instructions" rows="3" placeholder="Step-by-step payment instructions shown to customer at checkout..."
+              class="w-full p-space-md rounded bg-surface-container-low border border-surface-container font-body-sm text-body-sm text-on-surface focus:outline-none focus:ring-1 focus:ring-primary">${escapeHtml(method?.instructions || '')}</textarea>
+          </div>
+
+          <div class="flex items-center gap-space-md">
+            <div class="flex flex-col gap-space-2xs w-32">
+              <label class="font-label-sm text-[11px] uppercase font-semibold text-on-surface-variant">Display Order</label>
+              <input id="pm-order" type="number" min="0" value="${method ? method.display_order : 0}"
+                class="w-full px-space-md py-[8px] rounded bg-surface-container-low border border-surface-container font-body-sm text-body-sm text-on-surface focus:outline-none focus:ring-1 focus:ring-primary" />
+            </div>
+            <div class="flex items-center gap-space-sm pt-4">
+              <input id="pm-active" type="checkbox" ${(!method || method.is_active) ? 'checked' : ''} class="w-4 h-4 rounded text-primary focus:ring-primary" />
+              <label for="pm-active" class="font-label-md text-label-md text-on-surface font-medium cursor-pointer">Active at Checkout</label>
+            </div>
+          </div>
+        </form>
+
+        <div class="p-space-lg border-t border-surface-container flex items-center justify-end gap-space-md bg-surface-container-lowest sticky bottom-0">
+          <button id="cancel-pm-drawer-btn" class="px-space-md py-[8px] rounded bg-surface-container hover:bg-surface-container-high text-on-surface font-label-md text-label-md font-semibold transition-colors">
+            Cancel
+          </button>
+          <button id="save-pm-drawer-btn" class="flex items-center gap-space-xs px-space-lg py-[8px] rounded bg-primary text-on-primary hover:bg-primary-container font-label-md text-label-md font-semibold transition-colors shadow-sm">
+            <span class="material-symbols-outlined text-[18px]">save</span>
+            <span>${isEditing ? 'Save Changes' : 'Publish Payment Method'}</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  `;
+
+  const closeDrawer = () => { drawerEl.innerHTML = ''; };
+  document.getElementById('close-drawer-btn')?.addEventListener('click', closeDrawer);
+  document.getElementById('cancel-pm-drawer-btn')?.addEventListener('click', closeDrawer);
+  document.getElementById('drawer-backdrop')?.addEventListener('click', (e) => {
+    if (e.target.id === 'drawer-backdrop') closeDrawer();
+  });
+
+  document.getElementById('save-pm-drawer-btn')?.addEventListener('click', async () => {
+    const provider_name = document.getElementById('pm-provider')?.value.trim();
+    const account_number = document.getElementById('pm-account-number')?.value.trim();
+    const account_name = document.getElementById('pm-account-name')?.value.trim();
+    const instructions = document.getElementById('pm-instructions')?.value.trim();
+    const display_order = parseInt(document.getElementById('pm-order')?.value, 10) || 0;
+    const is_active = document.getElementById('pm-active')?.checked;
+
+    if (!provider_name || !account_number || !account_name) {
+      showToast('Please fill in provider name, account number, and account name.', 'error');
+      return;
+    }
+
+    try {
+      if (isEditing) {
+        showToast(`Updating ${provider_name}...`, 'info');
+        await api.updatePaymentMethod(method.id, {
+          provider_name,
+          account_number,
+          account_name,
+          instructions,
+          display_order,
+          is_active,
+        });
+        showToast(`Payment method "${provider_name}" updated.`, 'success');
+      } else {
+        showToast(`Creating ${provider_name}...`, 'info');
+        await api.createPaymentMethod({
+          provider_name,
+          account_number,
+          account_name,
+          instructions,
+          display_order,
+          is_active,
+        });
+        showToast(`Payment method "${provider_name}" created.`, 'success');
+      }
+      closeDrawer();
+      state.paymentMethods = await api.getPaymentMethods();
+      renderPaymentMethodsView();
+    } catch (err) {
+      showToast(err.message, 'error');
+    }
+  });
+}
+
+function attachPaymentMethodsEvents() {
+  document.getElementById('add-payment-method-btn')?.addEventListener('click', () => {
+    openPaymentMethodDrawer(null);
+  });
+
+  document.getElementById('pm-search-input')?.addEventListener('input', (e) => {
+    state.paymentMethodFilter.search = e.target.value.trim();
+    renderPaymentMethodsView();
+  });
+
+  document.querySelectorAll('.pm-filter-chip').forEach(chip => {
+    chip.addEventListener('click', () => {
+      state.paymentMethodFilter.status = chip.dataset.status;
+      renderPaymentMethodsView();
+    });
+  });
+
+  document.querySelectorAll('.edit-pm-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const pmId = parseInt(btn.dataset.pmId, 10);
+      const method = state.paymentMethods.find(m => m.id === pmId);
+      if (method) openPaymentMethodDrawer(method);
+    });
+  });
+
+  document.querySelectorAll('.toggle-pm-btn').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const pmId = parseInt(btn.dataset.pmId, 10);
+      const currentActive = btn.dataset.active === '1';
+      try {
+        await api.updatePaymentMethod(pmId, { is_active: !currentActive });
+        showToast(`Payment method ${!currentActive ? 'activated' : 'deactivated'}.`, 'success');
+        state.paymentMethods = await api.getPaymentMethods();
+        renderPaymentMethodsView();
+      } catch (err) {
+        showToast(err.message, 'error');
+      }
+    });
+  });
+
+  document.querySelectorAll('.delete-pm-btn').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const pmId = parseInt(btn.dataset.pmId, 10);
+      const method = state.paymentMethods.find(m => m.id === pmId);
+      if (!method) return;
+      if (!confirm(`Delete payment method "${method.provider_name}"?`)) return;
+      try {
+        await api.deletePaymentMethod(pmId);
+        showToast(`Payment method "${method.provider_name}" deleted.`, 'success');
+        state.paymentMethods = await api.getPaymentMethods();
+        renderPaymentMethodsView();
+      } catch (err) {
+        showToast(err.message, 'error');
+      }
+    });
+  });
+}
+
+// -------------------------------------------------------------
+// 6. ADMIN AUTHENTICATION GATE
 // -------------------------------------------------------------
 function renderLoginView() {
   return `
