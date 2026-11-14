@@ -1160,7 +1160,10 @@ function renderPaymentsView() {
                     <span class="font-headline-sm text-[15px] font-bold text-on-surface tabular-nums">${formatCurrency(p.total)}</span>
                   </div>
                   <div class="mt-space-xs flex items-center justify-between text-[11px] text-on-surface-variant">
-                    <span class="truncate max-w-[180px] font-mono">${escapeHtml(p.proof_filename || 'screenshot.jpg')}</span>
+                    <span class="inline-flex items-center gap-1 font-medium text-primary">
+                      <span class="material-symbols-outlined text-[13px]">account_balance_wallet</span>
+                      ${escapeHtml(p.payment_method || 'Telebirr')}
+                    </span>
                     <span>${formatDate(p.created_at)}</span>
                   </div>
                 </div>
@@ -1193,19 +1196,23 @@ function renderPaymentsView() {
               <div class="grid grid-cols-2 sm:grid-cols-4 gap-space-sm mt-space-md p-space-md rounded bg-surface-container-low">
                 <div>
                   <span class="font-label-sm text-[10px] uppercase font-semibold text-on-surface-variant">Customer</span>
-                  <div class="font-body-sm text-[12px] font-medium text-on-surface truncate">${escapeHtml(selected.customer_email)}</div>
+                  <div class="font-body-sm text-[12px] font-medium text-on-surface truncate" title="${escapeHtml(selected.customer_email)}">${escapeHtml(selected.customer_email)}</div>
+                  <span class="font-mono text-[10px] text-on-surface-variant">User ID: #${selected.customer_id || 'N/A'}</span>
                 </div>
                 <div>
-                  <span class="font-label-sm text-[10px] uppercase font-semibold text-on-surface-variant">Order Amount</span>
+                  <span class="font-label-sm text-[10px] uppercase font-semibold text-on-surface-variant">Order Reference</span>
                   <div class="font-headline-sm text-[15px] font-bold text-on-surface tabular-nums">${formatCurrency(selected.total)}</div>
+                  <span class="font-mono text-[10px] font-semibold text-primary">#ORD-${selected.order_id}</span>
                 </div>
                 <div>
-                  <span class="font-label-sm text-[10px] uppercase font-semibold text-on-surface-variant">Submitted At</span>
-                  <div class="font-body-sm text-[12px] text-on-surface-variant">${formatDate(selected.created_at)}</div>
+                  <span class="font-label-sm text-[10px] uppercase font-semibold text-on-surface-variant">Payment Method</span>
+                  <div class="font-body-sm text-[12px] font-semibold text-on-surface">${escapeHtml(selected.payment_method || 'Telebirr')}</div>
+                  <span class="font-label-sm text-[10px] text-on-surface-variant">${formatDate(selected.created_at)}</span>
                 </div>
                 <div>
-                  <span class="font-label-sm text-[10px] uppercase font-semibold text-on-surface-variant">File Name</span>
-                  <div class="font-mono text-[11px] text-on-surface truncate" title="${escapeHtml(selected.proof_filename)}">${escapeHtml(selected.proof_filename || 'screenshot.jpg')}</div>
+                  <span class="font-label-sm text-[10px] uppercase font-semibold text-on-surface-variant">R2 Proof File</span>
+                  <div class="font-mono text-[11px] text-on-surface truncate" title="${escapeHtml(selected.proof_filename || 'No proof file')}">${escapeHtml(selected.proof_filename || 'No file')}</div>
+                  <span class="font-label-sm text-[10px] text-on-surface-variant">Cloudflare R2 Bucket</span>
                 </div>
               </div>
             </div>
@@ -1214,7 +1221,7 @@ function renderPaymentsView() {
             <div class="flex flex-col gap-space-xs">
               <!-- Toolbar -->
               <div class="flex items-center justify-between px-space-xs">
-                <span class="font-label-sm text-[11px] uppercase font-semibold text-on-surface-variant">Bank Slip Canvas</span>
+                <span class="font-label-sm text-[11px] uppercase font-semibold text-on-surface-variant">Payment Screenshot Canvas (Cloudflare R2)</span>
                 <div class="flex items-center gap-space-2xs">
                   <button id="zoom-in-btn" class="p-space-2xs rounded bg-surface-container hover:bg-surface-container-high text-on-surface" title="Zoom In">
                     <span class="material-symbols-outlined text-[16px]">zoom_in</span>
@@ -1228,47 +1235,35 @@ function renderPaymentsView() {
                   <button id="reset-canvas-btn" class="px-space-xs py-space-2xs rounded bg-surface-container hover:bg-surface-container-high text-on-surface font-label-sm text-[11px]" title="Reset Canvas">
                     Reset
                   </button>
+                  ${selected.proof_filename ? `
+                    <button id="fullscreen-proof-btn" class="px-space-xs py-space-2xs rounded bg-primary text-on-primary hover:bg-primary-container font-label-sm text-[11px] flex items-center gap-1 shadow-sm" title="Open Full Resolution Modal">
+                      <span class="material-symbols-outlined text-[14px]">fullscreen</span>
+                      <span>Inspect</span>
+                    </button>
+                    <a href="${getApiBaseUrl()}/api/payments/proof/${encodeURIComponent(selected.proof_filename)}?token=${encodeURIComponent(state.token)}" target="_blank" rel="noopener noreferrer" class="px-space-xs py-space-2xs rounded bg-surface-container hover:bg-surface-container-high text-on-surface font-label-sm text-[11px] flex items-center gap-1" title="Open In New Window">
+                      <span class="material-symbols-outlined text-[14px]">open_in_new</span>
+                    </a>
+                  ` : ''}
                 </div>
               </div>
 
               <!-- Interactive Document Stage -->
-              <div class="proof-canvas-container h-[340px] bg-surface-container-high rounded flex items-center justify-center p-space-md border border-surface-container overflow-hidden">
-                <div id="proof-canvas-stage" class="proof-canvas-image transition-transform flex items-center justify-center">
-                  <!-- Simulated or Live Wire Proof Slip -->
-                  <div class="w-[320px] bg-white rounded shadow-md p-space-md border border-outline-variant/30 text-on-surface font-body-sm flex flex-col gap-space-xs">
-                    <div class="flex items-center justify-between border-b border-surface-container pb-space-xs">
-                      <div class="flex items-center gap-space-xs">
-                        <span class="material-symbols-outlined text-[18px] text-[#065F46]">account_balance</span>
-                        <span class="font-bold text-[13px] tracking-tight">COMMERCIAL BANK OF ETHIOPIA</span>
-                      </div>
-                      <span class="font-mono text-[10px] text-on-surface-variant">CONFIRMATION</span>
-                    </div>
-
-                    <div class="py-space-xs flex flex-col gap-space-2xs text-[11px]">
-                      <div class="flex justify-between">
-                        <span class="text-on-surface-variant">Reference:</span>
-                        <span class="font-mono font-semibold">REF-${selected.order_id}-${selected.id}TX</span>
-                      </div>
-                      <div class="flex justify-between">
-                        <span class="text-on-surface-variant">Debtor:</span>
-                        <span class="font-medium">${escapeHtml(selected.customer_email?.split('@')[0] || 'Customer')}</span>
-                      </div>
-                      <div class="flex justify-between">
-                        <span class="text-on-surface-variant">Beneficiary:</span>
-                        <span class="font-medium">WUDE MART TRADING PLC</span>
-                      </div>
-                      <div class="flex justify-between">
-                        <span class="text-on-surface-variant">Credited Amount:</span>
-                        <span class="font-bold font-mono text-[13px] text-[#065F46]">${formatCurrency(selected.total)}</span>
-                      </div>
-                    </div>
-
-                    <div class="border-t border-surface-container pt-space-xs flex items-center justify-between text-[10px] text-on-surface-variant">
-                      <span>Status: TELEBIRR / CBE SETTLED</span>
-                      <span class="font-mono">${escapeHtml(selected.proof_filename || 'verified_slip.png')}</span>
-                    </div>
+              <div class="proof-canvas-container min-h-[360px] max-h-[460px] bg-surface-container-high rounded flex items-center justify-center p-space-md border border-surface-container overflow-hidden relative">
+                ${selected.proof_filename ? `
+                  <div id="proof-canvas-stage" class="proof-canvas-image transition-transform flex items-center justify-center cursor-pointer" title="Click to inspect full resolution">
+                    <img id="proof-screenshot-img" 
+                         src="${getApiBaseUrl()}/api/payments/proof/${encodeURIComponent(selected.proof_filename)}?token=${encodeURIComponent(state.token)}" 
+                         alt="Payment screenshot for Order #${selected.order_id}"
+                         class="max-h-[340px] max-w-full object-contain rounded shadow-md border border-outline-variant/30 select-none bg-surface-container-lowest"
+                         onerror="this.onerror=null; this.parentElement.innerHTML='<div class=\'text-center p-space-lg text-error font-body-sm flex flex-col items-center gap-space-xs\'><span class=\'material-symbols-outlined text-[36px]\'>broken_image</span><span>Failed to load screenshot from Cloudflare R2 storage.</span></div>';" />
                   </div>
-                </div>
+                ` : `
+                  <div class="flex flex-col items-center justify-center text-on-surface-variant p-space-lg text-center">
+                    <span class="material-symbols-outlined text-[48px] text-outline-variant mb-space-sm">image_not_supported</span>
+                    <span class="font-body-md font-semibold text-on-surface">No Screenshot Attached</span>
+                    <span class="font-body-sm text-[12px] text-on-surface-variant">The customer has not yet uploaded a payment receipt for this order.</span>
+                  </div>
+                `}
               </div>
             </div>
 
@@ -1358,6 +1353,19 @@ function renderPaymentsView() {
     applyCanvasTransform();
   });
 
+  // Fullscreen / Inspection Modal Handlers
+  document.getElementById('fullscreen-proof-btn')?.addEventListener('click', () => {
+    if (selected && selected.proof_filename) {
+      openScreenshotModal(selected);
+    }
+  });
+
+  document.getElementById('proof-canvas-stage')?.addEventListener('click', () => {
+    if (selected && selected.proof_filename) {
+      openScreenshotModal(selected);
+    }
+  });
+
   // Reject Payment Action
   document.getElementById('reject-payment-btn')?.addEventListener('click', async () => {
     if (!selected) return;
@@ -1383,6 +1391,50 @@ function renderPaymentsView() {
     if (!selected) return;
     const note = document.getElementById('admin-review-note')?.value.trim();
     openApprovalModal(selected, note);
+  });
+}
+
+function openScreenshotModal(payment) {
+  const modalEl = document.getElementById('modal-container');
+  if (!modalEl || !payment?.proof_filename) return;
+
+  const proofUrl = `${getApiBaseUrl()}/api/payments/proof/${encodeURIComponent(payment.proof_filename)}?token=${encodeURIComponent(state.token)}`;
+
+  modalEl.innerHTML = `
+    <div id="proof-modal-backdrop" class="fixed inset-0 bg-black/80 z-50 flex flex-col items-center justify-center p-space-md backdrop-blur-sm">
+      <div class="w-full max-w-4xl bg-surface-container-lowest rounded shadow-2xl overflow-hidden flex flex-col max-h-[92vh]">
+        <div class="p-space-md border-b border-surface-container flex items-center justify-between bg-surface-container">
+          <div class="flex items-center gap-space-sm">
+            <span class="material-symbols-outlined text-primary text-[24px]">receipt_long</span>
+            <div>
+              <h3 class="font-headline-sm text-[16px] font-bold text-on-surface">Payment Proof Inspection — Order #ORD-${payment.order_id}</h3>
+              <span class="font-body-sm text-[12px] text-on-surface-variant">${escapeHtml(payment.customer_email)} • ${formatCurrency(payment.total)} • Method: ${escapeHtml(payment.payment_method || 'Telebirr')}</span>
+            </div>
+          </div>
+          <div class="flex items-center gap-space-xs">
+            <a href="${proofUrl}" target="_blank" rel="noopener noreferrer" class="px-space-sm py-space-2xs rounded bg-surface-container-high hover:bg-surface-container-highest text-on-surface font-label-sm text-[12px] flex items-center gap-space-2xs">
+              <span class="material-symbols-outlined text-[16px]">open_in_new</span> Direct
+            </a>
+            <button id="close-proof-modal-btn" class="p-space-2xs rounded hover:bg-surface-container-high text-on-surface">
+              <span class="material-symbols-outlined text-[20px]">close</span>
+            </button>
+          </div>
+        </div>
+        <div class="flex-1 overflow-auto p-space-md flex items-center justify-center bg-black/5 min-h-[300px]">
+          <img src="${proofUrl}" alt="Full resolution proof screenshot" class="max-w-full max-h-[75vh] object-contain rounded shadow-lg" />
+        </div>
+        <div class="p-space-sm border-t border-surface-container bg-surface-container-low flex items-center justify-between text-[11px] text-on-surface-variant font-mono">
+          <span>R2 Object: ${escapeHtml(payment.proof_filename)}</span>
+          <span>Submitted: ${formatDate(payment.created_at)}</span>
+        </div>
+      </div>
+    </div>
+  `;
+
+  const closeProofModal = () => { modalEl.innerHTML = ''; };
+  document.getElementById('close-proof-modal-btn')?.addEventListener('click', closeProofModal);
+  document.getElementById('proof-modal-backdrop')?.addEventListener('click', (e) => {
+    if (e.target.id === 'proof-modal-backdrop') closeProofModal();
   });
 }
 
